@@ -3,6 +3,9 @@ package com.privat.worker.service;
 import com.privat.worker.dto.ChargeDto;
 import com.privat.worker.dto.ChargeValidation;
 import com.privat.worker.dto.PaymentDto;
+import com.privat.worker.exception.ChargeCheckException;
+import com.privat.worker.exception.ChargeCreationException;
+import com.privat.worker.exception.PaymentFetchException;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
@@ -12,6 +15,7 @@ import org.springframework.web.client.HttpServerErrorException;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestTemplate;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
@@ -56,20 +60,20 @@ public class RegularPaymentService {
                  }
             }
         } catch (HttpClientErrorException e) {
-            throw new RuntimeException("Failed to create charge for paymentId: " + paymentId, e);
+            throw new ChargeCheckException("Failed to create charge for paymentId: " + paymentId, e);
         }catch (Exception e) {
-            throw new RuntimeException("Unexpected error : " + e.getMessage(), e);
+            throw new ChargeCheckException("Unexpected error : " + e.getMessage(), e);
         }
     }
 
-    private void makeCharges(UUID paymentId) {
+    public void makeCharges(UUID paymentId) {
         String endpoint = url + "/v1/charges-rest/" + paymentId;
         try {
            restTemplate.postForEntity(endpoint, null, ChargeDto.class);
         } catch (HttpClientErrorException e) {
-            throw new RuntimeException("Failed to create charge for paymentId: " + paymentId, e);
+            throw new ChargeCreationException("Failed to create charge for paymentId: " + paymentId, e);
         } catch (Exception e) {
-            throw new RuntimeException("Unexpected error : " + e.getMessage(), e);
+            throw new ChargeCreationException("Unexpected error : " + e.getMessage(), e);
         }
     }
 
@@ -86,16 +90,17 @@ public class RegularPaymentService {
             if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
                 return response.getBody();
             } else {
-                throw new RuntimeException("Failed to fetch payments. HTTP Status: " + response.getStatusCode());
+               System.err.println("Failed to fetch payments. HTTP Status: " + response.getStatusCode());
             }
         } catch (HttpClientErrorException e) {
-            throw new RuntimeException("Client error while fetching payments: " + e.getMessage(), e);
+            throw new PaymentFetchException("Client error while fetching payments: " + e.getMessage(), e);
         } catch (HttpServerErrorException e) {
-            throw new RuntimeException("Server error while fetching payments: " + e.getMessage(), e);
+            throw new PaymentFetchException("Server error while fetching payments: " + e.getMessage(), e);
         } catch (ResourceAccessException e) {
-            throw new RuntimeException("Failed to access payment API: " + e.getMessage(), e);
+            throw new PaymentFetchException("Failed to access payment API: " + e.getMessage(), e);
         } catch (Exception e) {
-            throw new RuntimeException("Unexpected error while fetching payments: " + e.getMessage(), e);
+            throw new PaymentFetchException("Unexpected error while fetching payments: " + e.getMessage(), e);
         }
+        return Collections.emptyList();
     }
 }
