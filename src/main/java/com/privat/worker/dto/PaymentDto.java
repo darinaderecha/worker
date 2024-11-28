@@ -5,9 +5,9 @@ import java.util.UUID;
 
 public record PaymentDto(UUID id,
                          UUID card,
-                         String IBAN,
-                         String MFO,
-                         String ZKPO,
+                         String iban,
+                         String mfo,
+                         String zkpo,
                          String receiverName,
                          BigDecimal amount,
                          Long withdrawalPeriod)  {
