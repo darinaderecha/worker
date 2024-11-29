@@ -30,15 +30,27 @@ public class RegularPaymentService {
     }
 
     public void processPayments() {
-        List<PaymentDto> payments = fetchAllPayments();
-        List<UUID> paymentIds = payments.stream()
-                .map(PaymentDto::id)
-                .toList();
-        for (UUID paymentId : paymentIds) {
-            try {
-                checkCharges(paymentId);
-            } catch (Exception e) {
-                System.err.println("Failed to process paymentId: " + paymentId + " \n" +  e.getMessage());
+        int page = 0;
+        int size = 4;
+        boolean hasMoreData = true;
+
+        while (hasMoreData) {
+            List<PaymentDto> payments = fetchAllPayments(page, size);
+            if (payments == null || payments.isEmpty()) {
+                hasMoreData = false;
+            } else {
+                List<UUID> paymentIds = payments.stream()
+                        .map(PaymentDto::id)
+                        .toList();
+
+                for (UUID paymentId : paymentIds) {
+                    try {
+                        checkCharges(paymentId);
+                    } catch (Exception e) {
+                        System.err.println("Failed to process paymentId: " + paymentId + " \n" + e.getMessage());
+                    }
+                }
+                page++;
             }
         }
     }
@@ -51,17 +63,18 @@ public class RegularPaymentService {
                     endpoint,
                     HttpMethod.GET,
                     null,
-                    new ParameterizedTypeReference<ChargeValidation>() {}
+                    new ParameterizedTypeReference<ChargeValidation>() {
+                    }
             );
-             if(response.getBody() != null &&  response.getStatusCode().is2xxSuccessful()){
-                 ChargeValidation validation = response.getBody();
-                 if(validation.isNeedToCharge()) {
-                     makeCharges(paymentId);
-                 }
+            if (response.getBody() != null && response.getStatusCode().is2xxSuccessful()) {
+                ChargeValidation validation = response.getBody();
+                if (validation.isNeedToCharge()) {
+                    makeCharges(paymentId);
+                }
             }
         } catch (HttpClientErrorException e) {
             throw new ChargeCheckException("Failed to create charge for paymentId: " + paymentId, e);
-        }catch (Exception e) {
+        } catch (Exception e) {
             throw new ChargeCheckException("Unexpected error : " + e.getMessage(), e);
         }
     }
@@ -69,7 +82,7 @@ public class RegularPaymentService {
     public void makeCharges(UUID paymentId) {
         String endpoint = url + "/v1/charges-rest/" + paymentId;
         try {
-           restTemplate.postForEntity(endpoint, null, ChargeDto.class);
+            restTemplate.postForEntity(endpoint, null, ChargeDto.class);
         } catch (HttpClientErrorException e) {
             throw new ChargeCreationException("Failed to create charge for paymentId: " + paymentId, e);
         } catch (Exception e) {
@@ -77,20 +90,21 @@ public class RegularPaymentService {
         }
     }
 
-    public List<PaymentDto> fetchAllPayments() {
-        String endpoint = url + "/v1/payments-rest/all";
+    public List<PaymentDto> fetchAllPayments(int page, int size) {
+        String endpoint = url + "/v1/payments-rest/all?page=" + page + "&size=" + size;
         try {
             ResponseEntity<List<PaymentDto>> response = restTemplate.exchange(
                     endpoint,
                     HttpMethod.GET,
                     null,
-                    new ParameterizedTypeReference<List<PaymentDto>>() {}
+                    new ParameterizedTypeReference<List<PaymentDto>>() {
+                    }
             );
 
             if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
                 return response.getBody();
             } else {
-               System.err.println("Failed to fetch payments. HTTP Status: " + response.getStatusCode());
+                System.err.println("Failed to fetch payments. HTTP Status: " + response.getStatusCode());
             }
         } catch (HttpClientErrorException e) {
             throw new PaymentFetchException("Client error while fetching payments: " + e.getMessage(), e);
